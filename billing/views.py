@@ -31,13 +31,50 @@ class DashboardSummaryView(APIView):
             'total_customers': total_customers,
             'total_products': total_products,
             'recent_invoices': recent_invoices_data
-        })
-
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import ProtectedError
-from .serializers import CustomerSerializer, CategorySerializer, ProductSerializer
+from django.http import HttpResponse
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from rest_framework.decorators import action
+from .serializers import CustomerSerializer, CategorySerializer, ProductSerializer, InvoiceReadSerializer, InvoiceCreateSerializer
 from .models import Category, Customer, Invoice, Product
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+import io
+
+class InvoiceViewSet(viewsets.ModelViewSet):
+    queryset = Invoice.objects.all().order_by('-created_at')
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['customer', 'status', 'payment_method']
+    search_fields = ['customer__name']
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return InvoiceCreateSerializer
+        return InvoiceReadSerializer
+
+    @action(detail=True, methods=['get'])
+    def pdf(self, request, pk=None):
+        invoice = self.get_object()
+        template_path = 'billing/invoice_pdf.html'
+        context = {'invoice': invoice}
+        
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="invoice_{invoice.id}.pdf"'
+        
+        template = get_template(template_path)
+        html = template.render(context)
+        
+        pisa_status = pisa.CreatePDF(
+            html, dest=response
+        )
+        
+        if pisa_status.err:
+            return HttpResponse('We had some errors <pre>' + html + '</pre>')
+        return response
 
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all().order_by('-created_at')

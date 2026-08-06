@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Invoice #{{ invoice.id }}</title>
+    <style>
+        body { font-family: Helvetica, sans-serif; font-size: 14px; color: #333; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #0056b3; margin-bottom: 5px; }
+        .header p { margin: 0; color: #777; }
+        
+        .info-section { width: 100%; margin-bottom: 30px; }
+        .info-table { width: 100%; }
+        .info-table td { vertical-align: top; }
+        
+        .customer-info h3 { margin-bottom: 5px; color: #333; }
+        .customer-info p { margin: 0; line-height: 1.5; }
+        
+        .invoice-details { text-align: right; }
+        .invoice-details p { margin: 3px 0; }
+        .invoice-details strong { display: inline-block; width: 120px; }
+        
+        table.items { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        table.items th { background-color: #f4f4f4; border-bottom: 2px solid #ddd; padding: 10px; text-align: left; }
+        table.items th.right, table.items td.right { text-align: right; }
+        table.items td { padding: 10px; border-bottom: 1px solid #ddd; }
+        
+        .totals { width: 100%; margin-top: 20px; }
+        .totals-table { width: 40%; float: right; border-collapse: collapse; }
+        .totals-table td { padding: 8px 10px; border-bottom: 1px solid #eee; text-align: right; }
+        .totals-table td.label { font-weight: bold; text-align: left; }
+        .totals-table tr.grand-total td { font-size: 16px; font-weight: bold; color: #0056b3; border-bottom: none; border-top: 2px solid #0056b3; }
+        
+        .footer { clear: both; margin-top: 50px; text-align: center; color: #888; font-size: 12px; border-top: 1px solid #ddd; padding-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>BILLWAY</h1>
+        <p>Premium Invoicing Solution</p>
+    </div>
+
+    <div class="info-section">
+        <table class="info-table">
+            <tr>
+                <td class="customer-info" style="width: 50%;">
+                    <h3>Billed To:</h3>
+                    <p>
+                        <strong>{{ invoice.customer.name }}</strong><br>
+                        {% if invoice.customer.email %}{{ invoice.customer.email }}<br>{% endif %}
+                        {% if invoice.customer.phone %}{{ invoice.customer.phone }}{% endif %}
+                    </p>
+                </td>
+                <td class="invoice-details" style="width: 50%;">
+                    <p><strong>Invoice No:</strong> #{{ invoice.id }}</p>
+                    <p><strong>Date:</strong> {{ invoice.created_at|date:"M d, Y" }}</p>
+                    <p><strong>Payment Method:</strong> {{ invoice.get_payment_method_display }}</p>
+                    <p><strong>Status:</strong> {{ invoice.get_status_display }}</p>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <table class="items">
+        <thead>
+            <tr>
+                <th>Item Description</th>
+                <th class="right">Qty</th>
+                <th class="right">Price</th>
+                <th class="right">Tax</th>
+                <th class="right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in invoice.items.all %}
+            <tr>
+                <td>{{ item.product.name }}</td>
+                <td class="right">{{ item.quantity }}</td>
+                <td class="right">${{ item.unit_price }}</td>
+                <td class="right">{{ item.tax_percentage }}%</td>
+                <td class="right">${{ item.line_total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals">
+        <table class="totals-table">
+            <tr>
+                <td class="label">Subtotal:</td>
+                <td>${{ invoice.subtotal }}</td>
+            </tr>
+            {% if invoice.discount_amount > 0 %}
+            <tr>
+                <td class="label">Discount ({{ invoice.discount_percentage }}%):</td>
+                <td style="color: red;">-${{ invoice.discount_amount }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <td class="label">Tax Total:</td>
+                <td>${{ invoice.tax_total }}</td>
+            </tr>
+            <tr class="grand-total">
+                <td class="label">Grand Total:</td>
+                <td>${{ invoice.grand_total }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="footer">
+        <p>Thank you for your business!</p>
+    </div>
+
+</body>
+</html>
