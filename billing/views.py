@@ -144,8 +144,8 @@ class ReportView(APIView):
         # Top Products
         from .models import InvoiceItem
         items = InvoiceItem.objects.filter(invoice__in=invoices)
-        top_products = items.values('product_name').annotate(quantity_sold=Sum('quantity'), revenue=Sum('line_total')).order_by('-revenue')[:5]
-        top_products_data = [{'product_name': p['product_name'], 'quantity_sold': p['quantity_sold'], 'revenue': float(p['revenue'])} for p in top_products]
+        top_products = items.values('product__name').annotate(quantity_sold=Sum('quantity'), revenue=Sum('line_total')).order_by('-revenue')[:5]
+        top_products_data = [{'product_name': p['product__name'], 'quantity_sold': p['quantity_sold'], 'revenue': float(p['revenue'])} for p in top_products]
         
         # Recent Invoices
         recent_invoices = invoices.select_related('customer').order_by('-created_at')[:5]
