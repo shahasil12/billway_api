@@ -43,13 +43,32 @@ from xhtml2pdf import pisa
 from rest_framework.decorators import action
 from .serializers import CustomerSerializer, CategorySerializer, ProductSerializer, InvoiceReadSerializer, InvoiceCreateSerializer, PaymentSerializer, BusinessSettingsSerializer
 from .models import Category, Customer, Invoice, Product, Payment, BusinessSettings
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission, SAFE_METHODS
 from rest_framework.response import Response
 import io
 
+class IsAdminOrAuthenticated(BasePermission):
+    """
+    Authenticated users can read (GET, HEAD, OPTIONS).
+    Admin/Staff users can do everything (create, update, delete).
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS:
+            return True
+        # Allow all write operations for admin/staff
+        return request.user.is_staff or request.user.is_superuser
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return request.user.is_authenticated
+        return request.user.is_staff or request.user.is_superuser
+
+
 class InvoiceViewSet(viewsets.ModelViewSet):
     queryset = Invoice.objects.all().order_by('-created_at')
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['customer', 'status', 'payment_method']
     search_fields = ['customer__name']
@@ -87,7 +106,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all().order_by('-payment_date')
     serializer_class = PaymentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['invoice', 'payment_method']
 
@@ -161,7 +180,7 @@ class BusinessSettingsView(APIView):
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all().order_by('-created_at')
     serializer_class = ProductSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['category', 'status']
     search_fields = ['name', 'barcode', 'description']
@@ -178,7 +197,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all().order_by('-created_at')
     serializer_class = CategorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'description']
 
@@ -194,7 +213,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all().order_by('-created_at')
     serializer_class = CustomerSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'email', 'phone']
 
