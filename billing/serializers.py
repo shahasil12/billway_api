@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Customer, Product, Invoice, InvoiceItem, Category
+from .models import Customer, Product, Invoice, InvoiceItem, Category, Payment
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -35,9 +35,16 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
         fields = ['id', 'product', 'product_name', 'product_category', 'quantity', 'unit_price', 'tax_percentage', 'tax_amount', 'line_total']
         read_only_fields = ['unit_price', 'tax_percentage', 'tax_amount', 'line_total']
 
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = '__all__'
+
 class InvoiceReadSerializer(serializers.ModelSerializer):
     customer = CustomerSerializer(read_only=True)
     items = InvoiceItemSerializer(many=True, read_only=True)
+    payments = PaymentSerializer(many=True, read_only=True)
+    balance_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
         model = Invoice

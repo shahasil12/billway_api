@@ -16,21 +16,24 @@ class DashboardSummaryView(APIView):
         todays_invoices = Invoice.objects.filter(created_at__date=today)
         
         # Metrics
-        todays_sales = todays_invoices.aggregate(Sum('total_amount'))['total_amount__sum'] or 0.00
+        todays_sales = todays_invoices.aggregate(Sum('grand_total'))['grand_total__sum'] or 0.00
         todays_invoice_count = todays_invoices.count()
         total_customers = Customer.objects.count()
         total_products = Product.objects.count()
+        total_invoices = Invoice.objects.count()
         
         # Recent Invoices
         recent_invoices = Invoice.objects.select_related('customer').order_by('-created_at')[:5]
-        recent_invoices_data = InvoiceSerializer(recent_invoices, many=True).data
+        recent_invoices_data = InvoiceReadSerializer(recent_invoices, many=True).data
         
         return Response({
             'todays_sales': float(todays_sales),
             'todays_invoice_count': todays_invoice_count,
             'total_customers': total_customers,
             'total_products': total_products,
+            'total_invoices': total_invoices,
             'recent_invoices': recent_invoices_data
+        })
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import ProtectedError
@@ -38,8 +41,8 @@ from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from rest_framework.decorators import action
-from .serializers import CustomerSerializer, CategorySerializer, ProductSerializer, InvoiceReadSerializer, InvoiceCreateSerializer
-from .models import Category, Customer, Invoice, Product
+from .serializers import CustomerSerializer, CategorySerializer, ProductSerializer, InvoiceReadSerializer, InvoiceCreateSerializer, PaymentSerializer
+from .models import Category, Customer, Invoice, Product, Payment
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 import io

@@ -41,6 +41,7 @@ class Invoice(models.Model):
     ]
     STATUS_CHOICES = [
         ('PAID', 'Paid'),
+        ('PARTIAL', 'Partial'),
         ('UNPAID', 'Unpaid'),
     ]
 
@@ -50,9 +51,14 @@ class Invoice(models.Model):
     discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES, default='CASH')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='UNPAID')
     created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def balance_due(self):
+        return self.grand_total - self.amount_paid
 
     def __str__(self):
         return f"Invoice #{self.id} - {self.customer.name}"
@@ -68,3 +74,39 @@ class InvoiceItem(models.Model):
 
     def __str__(self):
         return f"{self.quantity} x {self.product.name} (Invoice #{self.invoice.id})"
+
+class Payment(models.Model):
+    PAYMENT_CHOICES = [
+        ('CASH', 'Cash'),
+        ('CARD', 'Card'),
+        ('UPI', 'UPI'),
+        ('OTHER', 'Other'),
+    ]
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES, default='CASH')
+    reference_number = models.CharField(max_length=255, blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+    payment_date = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Payment of {self.amount} for Invoice #{self.invoice.id}"
+
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+from django.db.models import Sum
+
+@receiver([post_save, post_delete], sender=Payment)
+def update_invoice_payment_status(sender, instance, **kwargs):
+    invoice = instance.invoice
+    total_paid = invoice.payments.aggregate(total=Sum('amount'))['total'] or 0
+    
+    invoice.amount_paid = total_paid
+    if invoice.amount_paid >= invoice.grand_total:
+        invoice.status = 'PAID'
+    elif invoice.amount_paid > 0:
+        invoice.status = 'PARTIAL'
+    else:
+        invoice.status = 'UNPAID'
+        
+    invoice.save()
