@@ -34,9 +34,27 @@ class DashboardSummaryView(APIView):
         })
 
 from rest_framework import viewsets, filters
+from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import ProtectedError
-from .serializers import CustomerSerializer, CategorySerializer
+from .serializers import CustomerSerializer, CategorySerializer, ProductSerializer
 from .models import Category, Customer, Invoice, Product
+
+class ProductViewSet(viewsets.ModelViewSet):
+    queryset = Product.objects.all().order_by('-created_at')
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['category', 'status']
+    search_fields = ['name', 'barcode', 'description']
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {"detail": "Cannot delete product because it is part of an invoice."},
+                status=400
+            )
 
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all().order_by('-created_at')

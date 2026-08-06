@@ -14,6 +14,13 @@ class CategorySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A category with this name already exists.")
         return value
 
+class ProductSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+
+    class Meta:
+        model = Product
+        fields = '__all__'
+
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
