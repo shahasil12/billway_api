@@ -35,7 +35,24 @@ class DashboardSummaryView(APIView):
 
 from rest_framework import viewsets, filters
 from django.db.models import ProtectedError
-from .serializers import CustomerSerializer
+from .serializers import CustomerSerializer, CategorySerializer
+from .models import Category, Customer, Invoice, Product
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all().order_by('-created_at')
+    serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'description']
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {"detail": "Cannot delete category because there are products associated with it."},
+                status=400
+            )
 
 class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all().order_by('-created_at')

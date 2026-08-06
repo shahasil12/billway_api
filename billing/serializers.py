@@ -1,5 +1,18 @@
 from rest_framework import serializers
-from .models import Customer, Product, Invoice, InvoiceItem
+from .models import Customer, Product, Invoice, InvoiceItem, Category
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = '__all__'
+
+    def validate_name(self, value):
+        qs = Category.objects.filter(name__iexact=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError("A category with this name already exists.")
+        return value
 
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
