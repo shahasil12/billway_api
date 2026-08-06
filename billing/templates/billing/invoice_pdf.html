@@ -37,8 +37,12 @@
 <body>
 
     <div class="header">
-        <h1>BILLWAY</h1>
-        <p>Premium Invoicing Solution</p>
+        <h1>{{ settings.business_name }}</h1>
+        <p>{{ settings.business_address }}</p>
+        <p>Phone: {{ settings.phone_number }}</p>
+        {% if settings.gst_number %}
+        <p>GST: {{ settings.gst_number }}</p>
+        {% endif %}
     </div>
 
     <div class="info-section">
@@ -53,10 +57,10 @@
                     </p>
                 </td>
                 <td class="invoice-details" style="width: 50%;">
-                    <p><strong>Invoice No:</strong> #{{ invoice.id }}</p>
+                    <div class="invoice-title">INVOICE</div>
+                    <p><strong>Invoice No:</strong> {{ settings.invoice_prefix }}{{ invoice.id }}</p>
                     <p><strong>Date:</strong> {{ invoice.created_at|date:"M d, Y" }}</p>
-                    <p><strong>Payment Method:</strong> {{ invoice.get_payment_method_display }}</p>
-                    <p><strong>Status:</strong> {{ invoice.get_status_display }}</p>
+                    <p><strong>Status:</strong> <span class="status-{{ invoice.status|lower }}">{{ invoice.status }}</span></p>
                 </td>
             </tr>
         </table>
@@ -77,39 +81,39 @@
             <tr>
                 <td>{{ item.product.name }}</td>
                 <td class="right">{{ item.quantity }}</td>
-                <td class="right">${{ item.unit_price }}</td>
-                <td class="right">{{ item.tax_percentage }}%</td>
-                <td class="right">${{ item.line_total }}</td>
+                <td class="text-right">{{ settings.currency }}{{ item.unit_price }}</td>
+                <td class="text-right">{{ item.tax_percentage }}%</td>
+                <td class="text-right">{{ settings.currency }}{{ item.line_total }}</td>
             </tr>
             {% endfor %}
+            <tr class="total-row">
+                <td colspan="4" class="text-right"><strong>Subtotal:</strong></td>
+                <td class="text-right">{{ settings.currency }}{{ invoice.subtotal|floatformat:2 }}</td>
+            </tr>
         </tbody>
     </table>
 
     <div class="totals">
         <table class="totals-table">
-            <tr>
-                <td class="label">Subtotal:</td>
-                <td>${{ invoice.subtotal }}</td>
-            </tr>
             {% if invoice.discount_amount > 0 %}
             <tr>
                 <td class="label">Discount ({{ invoice.discount_percentage }}%):</td>
-                <td style="color: red;">-${{ invoice.discount_amount }}</td>
+                <td style="color: red;">-{{ settings.currency }}{{ invoice.discount_amount }}</td>
             </tr>
             {% endif %}
             <tr>
                 <td class="label">Tax Total:</td>
-                <td>${{ invoice.tax_total }}</td>
+                <td>{{ settings.currency }}{{ invoice.tax_total }}</td>
             </tr>
             <tr class="grand-total">
                 <td class="label">Grand Total:</td>
-                <td>${{ invoice.grand_total }}</td>
+                <td><strong>{{ settings.currency }}{{ invoice.grand_total|floatformat:2 }}</strong></td>
             </tr>
         </table>
     </div>
 
     <div class="footer">
-        <p>Thank you for your business!</p>
+        <p>{{ settings.invoice_footer }}</p>
     </div>
 
 </body>

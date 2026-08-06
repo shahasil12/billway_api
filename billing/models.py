@@ -110,3 +110,27 @@ def update_invoice_payment_status(sender, instance, **kwargs):
         invoice.status = 'UNPAID'
         
     invoice.save()
+
+class BusinessSettings(models.Model):
+    business_name = models.CharField(max_length=255, default="My Business")
+    business_address = models.TextField(default="123 Business St, City, Country")
+    phone_number = models.CharField(max_length=20, default="+1234567890")
+    gst_number = models.CharField(max_length=50, blank=True, null=True)
+    invoice_prefix = models.CharField(max_length=10, default="INV-")
+    invoice_footer = models.TextField(default="Thank you for your business.")
+    default_tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    currency = models.CharField(max_length=10, default="$")
+
+    def save(self, *args, **kwargs):
+        # Singleton pattern: Ensure only one instance exists
+        if not self.pk and BusinessSettings.objects.exists():
+            return
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_settings(cls):
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "Business Settings"

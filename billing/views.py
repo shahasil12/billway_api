@@ -41,8 +41,8 @@ from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from rest_framework.decorators import action
-from .serializers import CustomerSerializer, CategorySerializer, ProductSerializer, InvoiceReadSerializer, InvoiceCreateSerializer, PaymentSerializer
-from .models import Category, Customer, Invoice, Product, Payment
+from .serializers import CustomerSerializer, CategorySerializer, ProductSerializer, InvoiceReadSerializer, InvoiceCreateSerializer, PaymentSerializer, BusinessSettingsSerializer
+from .models import Category, Customer, Invoice, Product, Payment, BusinessSettings
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 import io
@@ -63,7 +63,12 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     def pdf(self, request, pk=None):
         invoice = self.get_object()
         template_path = 'billing/invoice_pdf.html'
-        context = {'invoice': invoice}
+        settings = BusinessSettings.get_settings()
+        
+        context = {
+            'invoice': invoice,
+            'settings': settings,
+        }
         
         response = HttpResponse(content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="invoice_{invoice.id}.pdf"'
@@ -136,6 +141,22 @@ class ReportView(APIView):
             'top_products': top_products_data,
             'recent_invoices': recent_invoices_data
         })
+
+class BusinessSettingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        settings = BusinessSettings.get_settings()
+        serializer = BusinessSettingsSerializer(settings)
+        return Response(serializer.data)
+
+    def put(self, request):
+        settings = BusinessSettings.get_settings()
+        serializer = BusinessSettingsSerializer(settings, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
 
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all().order_by('-created_at')
