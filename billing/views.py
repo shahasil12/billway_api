@@ -79,6 +79,64 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             return HttpResponse('We had some errors <pre>' + html + '</pre>')
         return response
 
+class PaymentViewSet(viewsets.ModelViewSet):
+    queryset = Payment.objects.all().order_by('-payment_date')
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['invoice', 'payment_method']
+
+from django.db.models.functions import TruncDate
+from datetime import datetime, timedelta
+
+class ReportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+
+        if start_date_str and end_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        else:
+            # Default to last 30 days
+            end_date = timezone.now().date()
+            start_date = end_date - timedelta(days=30)
+            
+        invoices = Invoice.objects.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+        
+        # Summary
+        total_sales = invoices.aggregate(Sum('grand_total'))['grand_total__sum'] or 0.00
+        total_collected = invoices.aggregate(Sum('amount_paid'))['amount_paid__sum'] or 0.00
+        total_pending = float(total_sales) - float(total_collected)
+        
+        # Sales Trend
+        trend = invoices.annotate(date=TruncDate('created_at')).values('date').annotate(total=Sum('grand_total')).order_by('date')
+        trend_data = [{'date': t['date'].strftime('%Y-%m-%d'), 'total': float(t['total'])} for t in trend]
+        
+        # Top Products
+        from .models import InvoiceItem
+        items = InvoiceItem.objects.filter(invoice__in=invoices)
+        top_products = items.values('product_name').annotate(quantity_sold=Sum('quantity'), revenue=Sum('line_total')).order_by('-revenue')[:5]
+        top_products_data = [{'product_name': p['product_name'], 'quantity_sold': p['quantity_sold'], 'revenue': float(p['revenue'])} for p in top_products]
+        
+        # Recent Invoices
+        recent_invoices = invoices.select_related('customer').order_by('-created_at')[:5]
+        recent_invoices_data = InvoiceReadSerializer(recent_invoices, many=True).data
+
+        return Response({
+            'summary': {
+                'total_sales': float(total_sales),
+                'total_collected': float(total_collected),
+                'total_pending': total_pending,
+                'invoice_count': invoices.count()
+            },
+            'sales_trend': trend_data,
+            'top_products': top_products_data,
+            'recent_invoices': recent_invoices_data
+        })
+
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all().order_by('-created_at')
     serializer_class = ProductSerializer
