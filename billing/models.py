@@ -112,6 +112,12 @@ def update_invoice_payment_status(sender, instance, **kwargs):
         
     invoice.save()
 
+@receiver(post_delete, sender=InvoiceItem)
+def restore_product_stock(sender, instance, **kwargs):
+    if instance.product:
+        instance.product.stock += instance.quantity
+        instance.product.save()
+
 class BusinessSettings(models.Model):
     business_name = models.CharField(max_length=255, default="My Business")
     business_address = models.TextField(default="123 Business St, City, Country")

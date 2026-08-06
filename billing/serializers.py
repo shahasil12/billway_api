@@ -112,6 +112,9 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         discount_amount = subtotal * (discount_percentage / 100)
         grand_total = subtotal - discount_amount + tax_total
 
+        # Auto-generate reference if not provided
+        reference = validated_data.get('reference')
+        
         # Create Invoice
         invoice = Invoice.objects.create(
             customer=validated_data['customer'],
@@ -121,8 +124,14 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
             discount_amount=discount_amount,
             tax_total=tax_total,
             grand_total=grand_total,
+            reference=reference,
             status='PAID' if validated_data.get('payment_method') != 'OTHER' else 'UNPAID' # simple logic
         )
+        
+        if not reference:
+            settings = BusinessSettings.get_settings()
+            invoice.reference = f"{settings.invoice_prefix}{invoice.id}"
+            invoice.save(update_fields=['reference'])
 
         # Create Items & Deduct Stock
         for ci in calculated_items:
