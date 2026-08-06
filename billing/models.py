@@ -46,6 +46,7 @@ class Invoice(models.Model):
     ]
 
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='invoices')
+    reference = models.CharField(max_length=50, blank=True, null=True, help_text="Optional reference number/note")
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
