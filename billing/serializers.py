@@ -64,7 +64,8 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Invoice
-        fields = ['customer', 'reference', 'discount_percentage', 'payment_method', 'items']
+        fields = ['id', 'customer', 'reference', 'discount_percentage', 'payment_method', 'items']
+        read_only_fields = ['id']
 
     def create(self, validated_data):
         items_data = validated_data.pop('items')
