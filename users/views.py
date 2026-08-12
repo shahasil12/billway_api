@@ -47,3 +47,16 @@ class ChangePasswordView(generics.UpdateAPIView):
             return Response({"detail": "Password updated successfully."}, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+from rest_framework import viewsets
+from .serializers import UserCreateSerializer
+from .permissions import IsAdmin
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all().order_by('-date_joined')
+    permission_classes = [IsAdmin]
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return UserCreateSerializer
+        return UserSerializer
