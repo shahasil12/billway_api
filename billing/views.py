@@ -49,28 +49,27 @@ from rest_framework.permissions import IsAuthenticated, BasePermission, SAFE_MET
 from rest_framework.response import Response
 import io
 
-class IsAdminOrAuthenticated(BasePermission):
+class IsManagerOrAdminOrReadOnly(BasePermission):
     """
     Authenticated users can read (GET, HEAD, OPTIONS).
-    Admin/Staff users can do everything (create, update, delete).
+    Manager/Admin users can do everything (create, update, delete).
     """
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
         if request.method in SAFE_METHODS:
             return True
-        # Allow all write operations for admin/staff
-        return request.user.is_staff or request.user.is_superuser
+        return request.user.role in ['ADMIN', 'MANAGER']
 
     def has_object_permission(self, request, view, obj):
         if request.method in SAFE_METHODS:
             return request.user.is_authenticated
-        return request.user.is_staff or request.user.is_superuser
+        return request.user.role in ['ADMIN', 'MANAGER']
 
 
 class InvoiceViewSet(viewsets.ModelViewSet):
     queryset = Invoice.objects.all().order_by('-created_at')
-    permission_classes = [IsAdminOrAuthenticated]
+    permission_classes = [IsManagerOrAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['customer', 'status', 'payment_method']
     search_fields = ['customer__name']
@@ -108,7 +107,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all().order_by('-payment_date')
     serializer_class = PaymentSerializer
-    permission_classes = [IsAdminOrAuthenticated]
+    permission_classes = [IsManagerOrAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['invoice', 'payment_method']
 
@@ -163,8 +162,16 @@ class ReportView(APIView):
             'recent_invoices': recent_invoices_data
         })
 
+class IsAdminOrReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS:
+            return True
+        return request.user.role == 'ADMIN'
+
 class BusinessSettingsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrReadOnly]
 
     def get(self, request):
         settings = BusinessSettings.get_settings()
@@ -182,7 +189,7 @@ class BusinessSettingsView(APIView):
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all().order_by('-created_at')
     serializer_class = ProductSerializer
-    permission_classes = [IsAdminOrAuthenticated]
+    permission_classes = [IsManagerOrAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['category', 'status']
     search_fields = ['name', 'barcode', 'description']
@@ -199,7 +206,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all().order_by('-created_at')
     serializer_class = CategorySerializer
-    permission_classes = [IsAdminOrAuthenticated]
+    permission_classes = [IsManagerOrAdminOrReadOnly]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'description']
 
@@ -215,7 +222,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all().order_by('-created_at')
     serializer_class = CustomerSerializer
-    permission_classes = [IsAdminOrAuthenticated]
+    permission_classes = [IsManagerOrAdminOrReadOnly]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'email', 'phone']
 
