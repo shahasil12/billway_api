@@ -45,7 +45,8 @@ class Invoice(models.Model):
         ('UNPAID', 'Unpaid'),
     ]
 
-    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='invoices')
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='invoices', null=True, blank=True)
+    pos_session = models.ForeignKey('pos.POSSession', on_delete=models.SET_NULL, related_name='invoices', null=True, blank=True)
     reference = models.CharField(max_length=50, blank=True, null=True, help_text="Optional reference number/note")
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)

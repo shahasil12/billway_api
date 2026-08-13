@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'core',
     'users',
     'billing',
+    'pos',
 ]
 
 MIDDLEWARE = [
