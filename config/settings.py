@@ -114,7 +114,7 @@ if SUPABASE_S3_ENDPOINT:
                 'file_overwrite': False,
                 'default_acl': None,
                 'querystring_auth': False,
-                'custom_domain': None,
+                'custom_domain': f"{SUPABASE_URL.replace('https://', '')}/storage/v1/object/public/{SUPABASE_BUCKET}",
             },
         },
         'staticfiles': {
