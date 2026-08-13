@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'django_filters',
     'corsheaders',
+    'storages',
     'core',
     'users',
     'billing',
@@ -91,10 +92,47 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# Media / File Storage
+SUPABASE_URL = env('SUPABASE_URL', default='')
+SUPABASE_KEY = env('SUPABASE_KEY', default='')
+SUPABASE_S3_ENDPOINT = env('SUPABASE_S3_ENDPOINT', default='')  # e.g. https://<project>.supabase.co/storage/v1/s3
+SUPABASE_BUCKET = env('SUPABASE_BUCKET', default='billway-media')
+SUPABASE_REGION = env('SUPABASE_REGION', default='ap-southeast-1')
+
+if SUPABASE_S3_ENDPOINT:
+    # Use Supabase S3-compatible storage
+    STORAGES = {
+        'default': {
+            'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+            'OPTIONS': {
+                'access_key': env('SUPABASE_S3_ACCESS_KEY', default=''),
+                'secret_key': env('SUPABASE_S3_SECRET_KEY', default=''),
+                'bucket_name': SUPABASE_BUCKET,
+                'region_name': SUPABASE_REGION,
+                'endpoint_url': SUPABASE_S3_ENDPOINT,
+                'file_overwrite': False,
+                'default_acl': 'public-read',
+                'custom_domain': None,
+            },
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
+    MEDIA_URL = f'{SUPABASE_S3_ENDPOINT}/{SUPABASE_BUCKET}/'
+else:
+    # Fallback to local storage (dev)
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
+    STORAGES = {
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
