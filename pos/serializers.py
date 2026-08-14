@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import POSSession
+from .models import POSSession, POSCashMovement
 from billing.models import Invoice, InvoiceItem, Payment, Product, Customer
 
 class POSSessionSerializer(serializers.ModelSerializer):
@@ -27,3 +27,9 @@ class POSCheckoutSerializer(serializers.Serializer):
     grand_total = serializers.DecimalField(max_digits=12, decimal_places=2)
     amount_paid = serializers.DecimalField(max_digits=12, decimal_places=2)
     payment_method = serializers.ChoiceField(choices=Payment.PAYMENT_CHOICES, default='CASH')
+
+class POSCashMovementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = POSCashMovement
+        fields = '__all__'
+        read_only_fields = ('id', 'pos_session', 'created_at')

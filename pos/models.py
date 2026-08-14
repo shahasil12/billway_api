@@ -20,3 +20,18 @@ class POSSession(models.Model):
 
     def __str__(self):
         return f"Session {self.id} - {self.user.username} ({self.status})"
+
+class POSCashMovement(models.Model):
+    MOVEMENT_CHOICES = [
+        ('IN', 'Cash In'),
+        ('OUT', 'Cash Out'),
+    ]
+
+    pos_session = models.ForeignKey(POSSession, on_delete=models.CASCADE, related_name='cash_movements')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    movement_type = models.CharField(max_length=10, choices=MOVEMENT_CHOICES)
+    reason = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.movement_type} {self.amount} for Session {self.pos_session.id}"

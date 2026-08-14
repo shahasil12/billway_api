@@ -6,8 +6,8 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Sum
 
-from .models import POSSession
-from .serializers import POSSessionSerializer, POSSessionCloseSerializer, POSCheckoutSerializer
+from .models import POSSession, POSCashMovement
+from .serializers import POSSessionSerializer, POSSessionCloseSerializer, POSCheckoutSerializer, POSCashMovementSerializer
 from billing.models import Invoice, InvoiceItem, Payment, Product, Customer
 from billing.serializers import InvoiceReadSerializer
 
@@ -54,8 +54,11 @@ class CloseSessionView(APIView):
                 invoice__pos_session=session, 
                 payment_method='CASH'
             ).aggregate(total=Sum('amount'))['total'] or 0
+
+            cash_in = POSCashMovement.objects.filter(pos_session=session, movement_type='IN').aggregate(total=Sum('amount'))['total'] or 0
+            cash_out = POSCashMovement.objects.filter(pos_session=session, movement_type='OUT').aggregate(total=Sum('amount'))['total'] or 0
             
-            expected_cash = session.opening_cash + cash_sales
+            expected_cash = session.opening_cash + cash_sales + cash_in - cash_out
             cash_difference = closing_cash - expected_cash
 
             session.closing_cash = closing_cash
@@ -68,6 +71,27 @@ class CloseSessionView(APIView):
             return Response(POSSessionSerializer(session).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class POSCashMovementView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        session = POSSession.objects.filter(user=request.user, status='OPEN').first()
+        if not session:
+            return Response({'detail': 'No active session found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = POSCashMovementSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(pos_session=session)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def get(self, request):
+        session = POSSession.objects.filter(user=request.user, status='OPEN').first()
+        if not session:
+            return Response({'detail': 'No active session found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        movements = POSCashMovement.objects.filter(pos_session=session).order_by('-created_at')
+        return Response(POSCashMovementSerializer(movements, many=True).data)
 
 class POSCheckoutView(APIView):
     permission_classes = [IsAuthenticated]
