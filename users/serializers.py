@@ -21,9 +21,12 @@ class UserCreateSerializer(serializers.ModelSerializer):
         fields = ('id', 'username', 'email', 'password', 'first_name', 'last_name', 'role')
         
     def create(self, validated_data):
+        username = validated_data['username'].strip()
+        email = validated_data.get('email', '').strip().lower()
+        
         user = User.objects.create(
-            username=validated_data['username'],
-            email=validated_data.get('email', ''),
+            username=username,
+            email=email,
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
             role=validated_data.get('role', 'CASHIER')
