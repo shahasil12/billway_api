@@ -52,12 +52,15 @@ import io
 class IsManagerOrAdminOrReadOnly(BasePermission):
     """
     Authenticated users can read (GET, HEAD, OPTIONS).
-    Manager/Admin users can do everything (create, update, delete).
+    Manager/Admin users can do everything.
+    Cashiers can also create.
     """
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
         if request.method in SAFE_METHODS:
+            return True
+        if request.method == 'POST' and request.user.role == 'CASHIER':
             return True
         return request.user.role in ['ADMIN', 'MANAGER']
 
