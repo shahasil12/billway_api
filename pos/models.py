@@ -9,6 +9,7 @@ class POSSession(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey('users.Company', on_delete=models.CASCADE, related_name='pos_sessions')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='pos_sessions')
     opening_cash = models.DecimalField(max_digits=12, decimal_places=2)
     closing_cash = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)

@@ -43,8 +43,8 @@ from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from rest_framework.decorators import action
-from .serializers import CustomerSerializer, CategorySerializer, ProductSerializer, InvoiceReadSerializer, InvoiceCreateSerializer, PaymentSerializer, BusinessSettingsSerializer
-from .models import Category, Customer, Invoice, Product, Payment, BusinessSettings
+from .serializers import CustomerSerializer, CategorySerializer, ProductSerializer, InvoiceReadSerializer, InvoiceCreateSerializer, PaymentSerializer
+from .models import Category, Customer, Invoice, Product, Payment
 from rest_framework.permissions import IsAuthenticated, BasePermission, SAFE_METHODS
 from rest_framework.response import Response
 import io
@@ -71,11 +71,18 @@ class IsManagerOrAdminOrReadOnly(BasePermission):
 
 
 class InvoiceViewSet(viewsets.ModelViewSet):
-    queryset = Invoice.objects.all().order_by('-created_at')
     permission_classes = [IsManagerOrAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['customer', 'status', 'payment_method']
     search_fields = ['customer__name']
+
+    def get_queryset(self):
+        if hasattr(self.request.user, 'company') and self.request.user.company:
+            return Invoice.objects.filter(company=self.request.user.company).order_by('-created_at')
+        return Invoice.objects.none()
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.user.company)
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -86,7 +93,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     def pdf(self, request, pk=None):
         invoice = self.get_object()
         template_path = 'billing/invoice_pdf.html'
-        settings = BusinessSettings.get_settings()
+        settings = invoice.company
         
         context = {
             'invoice': invoice,
@@ -108,11 +115,15 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return response
 
 class PaymentViewSet(viewsets.ModelViewSet):
-    queryset = Payment.objects.all().order_by('-payment_date')
     serializer_class = PaymentSerializer
     permission_classes = [IsManagerOrAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['invoice', 'payment_method']
+
+    def get_queryset(self):
+        if hasattr(self.request.user, 'company') and self.request.user.company:
+            return Payment.objects.filter(invoice__company=self.request.user.company).order_by('-payment_date')
+        return Payment.objects.none()
 
 from django.db.models.functions import TruncDate
 from datetime import datetime, timedelta
@@ -132,7 +143,14 @@ class ReportView(APIView):
             end_date = timezone.now().date()
             start_date = end_date - timedelta(days=30)
             
-        invoices = Invoice.objects.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+        if hasattr(request.user, 'company') and request.user.company:
+            invoices = Invoice.objects.filter(
+                company=request.user.company,
+                created_at__date__gte=start_date,
+                created_at__date__lte=end_date
+            )
+        else:
+            invoices = Invoice.objects.none()
         
         # Summary
         total_sales = invoices.aggregate(Sum('grand_total'))['grand_total__sum'] or 0.00
@@ -165,37 +183,22 @@ class ReportView(APIView):
             'recent_invoices': recent_invoices_data
         })
 
-class IsAdminOrReadOnly(BasePermission):
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-        if request.method in SAFE_METHODS:
-            return True
-        return request.user.role == 'ADMIN'
 
-class BusinessSettingsView(APIView):
-    permission_classes = [IsAdminOrReadOnly]
-
-    def get(self, request):
-        settings = BusinessSettings.get_settings()
-        serializer = BusinessSettingsSerializer(settings)
-        return Response(serializer.data)
-
-    def put(self, request):
-        settings = BusinessSettings.get_settings()
-        serializer = BusinessSettingsSerializer(settings, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=400)
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.all().order_by('-created_at')
     serializer_class = ProductSerializer
     permission_classes = [IsManagerOrAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['category', 'status']
     search_fields = ['name', 'barcode', 'description']
+
+    def get_queryset(self):
+        if hasattr(self.request.user, 'company') and self.request.user.company:
+            return Product.objects.filter(company=self.request.user.company).order_by('-created_at')
+        return Product.objects.none()
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.user.company)
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -207,11 +210,18 @@ class ProductViewSet(viewsets.ModelViewSet):
             )
 
 class CategoryViewSet(viewsets.ModelViewSet):
-    queryset = Category.objects.all().order_by('-created_at')
     serializer_class = CategorySerializer
     permission_classes = [IsManagerOrAdminOrReadOnly]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'description']
+
+    def get_queryset(self):
+        if hasattr(self.request.user, 'company') and self.request.user.company:
+            return Category.objects.filter(company=self.request.user.company).order_by('-created_at')
+        return Category.objects.none()
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.user.company)
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -223,11 +233,18 @@ class CategoryViewSet(viewsets.ModelViewSet):
             )
 
 class CustomerViewSet(viewsets.ModelViewSet):
-    queryset = Customer.objects.all().order_by('-created_at')
     serializer_class = CustomerSerializer
     permission_classes = [IsManagerOrAdminOrReadOnly]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'email', 'phone']
+
+    def get_queryset(self):
+        if hasattr(self.request.user, 'company') and self.request.user.company:
+            return Customer.objects.filter(company=self.request.user.company).order_by('-created_at')
+        return Customer.objects.none()
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.user.company)
 
     def destroy(self, request, *args, **kwargs):
         try:

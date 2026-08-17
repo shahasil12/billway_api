@@ -1,6 +1,7 @@
 from django.db import models
 
 class Customer(models.Model):
+    company = models.ForeignKey('users.Company', on_delete=models.CASCADE, related_name='customers')
     name = models.CharField(max_length=255)
     email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
@@ -10,6 +11,7 @@ class Customer(models.Model):
         return self.name
 
 class Category(models.Model):
+    company = models.ForeignKey('users.Company', on_delete=models.CASCADE, related_name='categories')
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -18,6 +20,7 @@ class Category(models.Model):
         return self.name
 
 class Product(models.Model):
+    company = models.ForeignKey('users.Company', on_delete=models.CASCADE, related_name='products')
     name = models.CharField(max_length=255)
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name='products', null=True, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -45,6 +48,7 @@ class Invoice(models.Model):
         ('UNPAID', 'Unpaid'),
     ]
 
+    company = models.ForeignKey('users.Company', on_delete=models.CASCADE, related_name='invoices')
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='invoices', null=True, blank=True)
     pos_session = models.ForeignKey('pos.POSSession', on_delete=models.SET_NULL, related_name='invoices', null=True, blank=True)
     reference = models.CharField(max_length=50, blank=True, null=True, help_text="Optional reference number/note")
@@ -119,26 +123,4 @@ def restore_product_stock(sender, instance, **kwargs):
         instance.product.stock += instance.quantity
         instance.product.save()
 
-class BusinessSettings(models.Model):
-    business_name = models.CharField(max_length=255, default="My Business")
-    business_address = models.TextField(default="123 Business St, City, Country")
-    phone_number = models.CharField(max_length=20, default="+1234567890")
-    gst_number = models.CharField(max_length=50, blank=True, null=True)
-    invoice_prefix = models.CharField(max_length=10, default="INV-")
-    invoice_footer = models.TextField(default="Thank you for your business.")
-    default_tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
-    currency = models.CharField(max_length=10, default="$")
 
-    def save(self, *args, **kwargs):
-        # Singleton pattern: Ensure only one instance exists
-        if not self.pk and BusinessSettings.objects.exists():
-            return
-        super().save(*args, **kwargs)
-
-    @classmethod
-    def get_settings(cls):
-        obj, created = cls.objects.get_or_create(pk=1)
-        return obj
-
-    def __str__(self):
-        return "Business Settings"

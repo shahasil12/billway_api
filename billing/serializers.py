@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Customer, Product, Invoice, InvoiceItem, Category, Payment, BusinessSettings
+from .models import Customer, Product, Invoice, InvoiceItem, Category, Payment
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -49,10 +49,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = '__all__'
 
-class BusinessSettingsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = BusinessSettings
-        fields = '__all__'
+
 
 class InvoiceReadSerializer(serializers.ModelSerializer):
     customer = CustomerSerializer(read_only=True)
@@ -139,8 +136,9 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         )
         
         if not reference:
-            settings = BusinessSettings.get_settings()
-            invoice.reference = f"{settings.invoice_prefix}{invoice.id}"
+            company = invoice.company
+            prefix = company.invoice_prefix if company else "INV-"
+            invoice.reference = f"{prefix}{invoice.id}"
             invoice.save(update_fields=['reference'])
 
         # Create Items & Deduct Stock
