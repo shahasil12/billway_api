@@ -23,12 +23,17 @@ class Product(models.Model):
     company = models.ForeignKey('users.Company', on_delete=models.CASCADE, related_name='products')
     name = models.CharField(max_length=255)
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name='products', null=True, blank=True)
+    product_type = models.CharField(max_length=20, choices=[('NORMAL', 'Normal Product'), ('FOOD', 'Food Item')], default='NORMAL')
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     barcode = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     image = models.ImageField(upload_to='products/', blank=True, null=True)
+    track_stock = models.BooleanField(default=False)
     stock = models.IntegerField(default=0)
+    min_stock = models.IntegerField(default=0)
+    unit = models.CharField(max_length=20, default='Piece', blank=True)
     status = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -50,7 +55,7 @@ class Invoice(models.Model):
     ]
 
     company = models.ForeignKey('users.Company', on_delete=models.CASCADE, related_name='invoices')
-    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='invoices', null=True, blank=True)
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, related_name='invoices', null=True, blank=True)
     pos_session = models.ForeignKey('pos.POSSession', on_delete=models.SET_NULL, related_name='invoices', null=True, blank=True)
     reference = models.CharField(max_length=50, blank=True, null=True, help_text="Optional reference number/note")
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
@@ -75,6 +80,7 @@ class InvoiceItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     quantity = models.IntegerField(default=1)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     tax_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
@@ -121,8 +127,33 @@ def update_invoice_payment_status(sender, instance, **kwargs):
 
 @receiver(post_delete, sender=InvoiceItem)
 def restore_product_stock(sender, instance, **kwargs):
-    if instance.product:
+    if instance.product and instance.product.track_stock:
         instance.product.stock += instance.quantity
         instance.product.save()
+        StockMovement.objects.create(
+            product=instance.product,
+            movement_type='SALE',
+            quantity=instance.quantity,
+            reference=f"RESTORE-INV-{instance.invoice.id}"
+        )
+
+class StockMovement(models.Model):
+    MOVEMENT_TYPES = [
+        ('OPENING', 'Opening'),
+        ('PURCHASE', 'Purchase'),
+        ('SALE', 'Sale'),
+        ('ADJUSTMENT', 'Adjustment'),
+        ('WASTAGE', 'Wastage'),
+    ]
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_movements')
+    movement_type = models.CharField(max_length=20, choices=MOVEMENT_TYPES)
+    quantity = models.IntegerField()
+    reference = models.CharField(max_length=100, blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.product.name} - {self.movement_type} ({self.quantity})"
+
 
 

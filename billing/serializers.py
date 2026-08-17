@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Customer, Product, Invoice, InvoiceItem, Category, Payment
+from .models import Customer, Product, Invoice, InvoiceItem, Category, Payment, StockMovement
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -85,10 +85,11 @@ class InvoiceCreateItemSerializer(serializers.Serializer):
 
 class InvoiceCreateSerializer(serializers.ModelSerializer):
     items = InvoiceCreateItemSerializer(many=True, write_only=True)
+    amount_paid = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, write_only=True)
 
     class Meta:
         model = Invoice
-        fields = ['id', 'customer', 'reference', 'discount_percentage', 'payment_method', 'items']
+        fields = ['id', 'customer', 'reference', 'discount_percentage', 'payment_method', 'amount_paid', 'items']
         read_only_fields = ['id']
 
     def create(self, validated_data):
@@ -106,7 +107,7 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
             quantity = item_data['quantity']
             
             # Stock check
-            if product.stock < quantity:
+            if product.track_stock and product.stock < quantity:
                 raise serializers.ValidationError(f"Not enough stock for {product.name}. Available: {product.stock}")
 
             unit_price = product.price
@@ -142,7 +143,7 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         
         # Create Invoice
         invoice = Invoice.objects.create(
-            customer=validated_data['customer'],
+            customer=validated_data.get('customer'),
             payment_method=validated_data.get('payment_method', 'CASH'),
             discount_percentage=discount_percentage,
             subtotal=subtotal,
@@ -150,7 +151,7 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
             tax_total=tax_total,
             grand_total=grand_total,
             reference=reference,
-            status='PAID' if validated_data.get('payment_method') != 'OTHER' else 'UNPAID' # simple logic
+            status='UNPAID'
         )
         
         if not reference:
@@ -172,9 +173,29 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
             )
             # Deduct stock
             product = ci['product']
-            product.stock -= ci['quantity']
-            product.save()
+            if product.track_stock:
+                product.stock -= ci['quantity']
+                product.save()
+                StockMovement.objects.create(
+                    product=product,
+                    movement_type='SALE',
+                    quantity=-ci['quantity'],
+                    reference=invoice.reference
+                )
 
+        # Handle amount_paid
+        amount_paid = validated_data.get('amount_paid', 0)
+        if amount_paid > 0:
+            Payment.objects.create(
+                invoice=invoice,
+                amount=amount_paid,
+                payment_method=validated_data.get('payment_method', 'CASH'),
+                notes='Initial payment at checkout'
+            )
+            # The signal will automatically update the invoice amount_paid and status
+
+        # Refresh from db since signals might have modified it
+        invoice.refresh_from_db()
         return invoice
 
     def to_representation(self, instance):

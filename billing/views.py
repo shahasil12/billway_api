@@ -24,17 +24,59 @@ class DashboardSummaryView(APIView):
         total_products = Product.objects.count()
         total_invoices = Invoice.objects.count()
         
+        # Calculate today's profit
+        from .models import InvoiceItem, Payment
+        todays_items = InvoiceItem.objects.filter(invoice__created_at__date=today)
+        # Profit = line_total - (cost_price * quantity)
+        # Note: In a real app we might subtract tax as well, but for simplicity we'll just subtract cost.
+        todays_profit = 0.00
+        for item in todays_items:
+            todays_profit += float(item.line_total) - (float(item.cost_price) * item.quantity)
+            
+        # Payment Methods Today
+        todays_payments = Payment.objects.filter(payment_date__date=today)
+        payment_methods_qs = todays_payments.values('payment_method').annotate(total=Sum('amount')).order_by('-total')
+        payment_methods = [{'method': p['payment_method'], 'amount': float(p['total'])} for p in payment_methods_qs if p['total']]
+        
+        # Low Stock Products
+        from django.db.models import F
+        low_stock_qs = Product.objects.filter(track_stock=True, stock__lte=F('min_stock')).order_by('stock')[:5]
+        low_stock_products = [{'id': p.id, 'name': p.name, 'stock': p.stock} for p in low_stock_qs]
+        
         # Recent Invoices
         recent_invoices = Invoice.objects.select_related('customer').order_by('-created_at')[:5]
         recent_invoices_data = InvoiceReadSerializer(recent_invoices, many=True).data
         
+        # Overdue Credit (> 30 days)
+        one_month_ago = today - timedelta(days=30)
+        overdue_invoices = Invoice.objects.filter(status__in=['UNPAID', 'PARTIAL'], created_at__date__lte=one_month_ago)
+        # balance_due isn't a database field (it's a property). We calculate: grand_total_sum - amount_paid_sum
+        grand_total_sum = overdue_invoices.aggregate(Sum('grand_total'))['grand_total__sum'] or 0.00
+        amount_paid_sum = overdue_invoices.aggregate(Sum('amount_paid'))['amount_paid__sum'] or 0.00
+        overdue_credit_value = float(grand_total_sum) - float(amount_paid_sum)
+        
+        # Sales Trend (last 7 days)
+        seven_days_ago = today - timedelta(days=7)
+        trend = Invoice.objects.filter(created_at__date__gte=seven_days_ago).annotate(date=TruncDate('created_at')).values('date').annotate(total=Sum('grand_total')).order_by('date')
+        trend_data = [{'date': t['date'].strftime('%Y-%m-%d'), 'total': float(t['total'])} for t in trend]
+        
+        # Top Products
+        top_products = InvoiceItem.objects.values('product__name').annotate(quantity_sold=Sum('quantity'), revenue=Sum('line_total')).order_by('-revenue')[:5]
+        top_products_data = [{'product_name': p['product__name'], 'quantity_sold': p['quantity_sold'], 'revenue': float(p['revenue'])} for p in top_products]
+
         return Response({
             'todays_sales': float(todays_sales),
+            'todays_profit': float(todays_profit),
             'todays_invoice_count': todays_invoice_count,
             'total_customers': total_customers,
             'total_products': total_products,
             'total_invoices': total_invoices,
-            'recent_invoices': recent_invoices_data
+            'recent_invoices': recent_invoices_data,
+            'overdue_credit': max(0.0, overdue_credit_value),
+            'sales_trend': trend_data,
+            'top_products': top_products_data,
+            'payment_methods': payment_methods,
+            'low_stock_products': low_stock_products,
         })
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
@@ -208,6 +250,51 @@ class ProductViewSet(viewsets.ModelViewSet):
                 {"detail": "Cannot delete product because it is part of an invoice."},
                 status=400
             )
+
+    @action(detail=True, methods=['post'])
+    def add_stock(self, request, pk=None):
+        product = self.get_object()
+        if not product.track_stock:
+            return Response({"detail": "Stock tracking is disabled for this product."}, status=400)
+            
+        quantity = int(request.data.get('quantity', 0))
+        if quantity <= 0:
+            return Response({"detail": "Quantity must be greater than zero."}, status=400)
+            
+        product.stock += quantity
+        product.save()
+        
+        from .models import StockMovement
+        StockMovement.objects.create(
+            product=product,
+            movement_type='PURCHASE',
+            quantity=quantity,
+            reference=request.data.get('reference', ''),
+            notes=request.data.get('notes', '')
+        )
+        return Response({'status': 'stock added', 'current_stock': product.stock})
+
+    @action(detail=True, methods=['post'])
+    def adjust_stock(self, request, pk=None):
+        product = self.get_object()
+        if not product.track_stock:
+            return Response({"detail": "Stock tracking is disabled for this product."}, status=400)
+            
+        quantity = int(request.data.get('quantity', 0)) # can be negative
+        reason = request.data.get('reason', 'ADJUSTMENT')
+        
+        product.stock += quantity
+        product.save()
+        
+        from .models import StockMovement
+        StockMovement.objects.create(
+            product=product,
+            movement_type=reason,
+            quantity=quantity,
+            notes=request.data.get('notes', '')
+        )
+        return Response({'status': 'stock adjusted', 'current_stock': product.stock})
+
 
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
