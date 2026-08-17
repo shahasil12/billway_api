@@ -40,6 +40,7 @@ class Invoice(models.Model):
         ('CASH', 'Cash'),
         ('CARD', 'Card'),
         ('UPI', 'UPI'),
+        ('CREDIT', 'Credit'),
         ('OTHER', 'Other'),
     ]
     STATUS_CHOICES = [
@@ -86,6 +87,7 @@ class Payment(models.Model):
         ('CASH', 'Cash'),
         ('CARD', 'Card'),
         ('UPI', 'UPI'),
+        ('CREDIT', 'Credit'),
         ('OTHER', 'Other'),
     ]
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payments')

@@ -254,3 +254,42 @@ class CustomerViewSet(viewsets.ModelViewSet):
                 {"detail": "Cannot delete customer because they have active invoices."},
                 status=400
             )
+
+    @action(detail=True, methods=['post'])
+    def pay_credit(self, request, pk=None):
+        customer = self.get_object()
+        amount = float(request.data.get('amount', 0))
+        payment_method = request.data.get('payment_method', 'CASH')
+        
+        if amount <= 0:
+            return Response({"detail": "Amount must be greater than zero."}, status=400)
+            
+        unpaid_invoices = Invoice.objects.filter(
+            customer=customer, 
+            status__in=['UNPAID', 'PARTIAL']
+        ).order_by('created_at')
+        
+        remaining_amount = amount
+        payments_created = []
+        
+        for invoice in unpaid_invoices:
+            if remaining_amount <= 0:
+                break
+                
+            due = float(invoice.balance_due)
+            payment_amount = min(due, remaining_amount)
+            
+            payment = Payment.objects.create(
+                invoice=invoice,
+                amount=payment_amount,
+                payment_method=payment_method
+            )
+            payments_created.append(payment.id)
+            
+            remaining_amount -= payment_amount
+            
+        return Response({
+            "detail": "Credit payment processed.",
+            "payments_created": payments_created,
+            "remaining_unapplied_amount": remaining_amount
+        })

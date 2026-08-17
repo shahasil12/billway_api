@@ -162,6 +162,9 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
 
         return invoice
 
+    def to_representation(self, instance):
+        return InvoiceReadSerializer(instance, context=self.context).data
+
     def validate_email(self, value):
         if value:
             # Check for uniqueness, excluding the current instance if it's an update
