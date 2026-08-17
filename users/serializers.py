@@ -88,3 +88,14 @@ class RegisterSerializer(serializers.Serializer):
         user.set_password(validated_data['password'])
         user.save()
         return user
+
+    def to_representation(self, instance):
+        # instance is the User object returned by create()
+        return {
+            'id': instance.id,
+            'username': instance.username,
+            'email': instance.email,
+            'role': instance.role,
+            'company_id': instance.company_id,
+            'company_name': instance.company.name if instance.company else None,
+        }
