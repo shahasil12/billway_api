@@ -38,6 +38,21 @@ class CustomerSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['company']
 
+    def validate_email(self, value):
+        if value:
+            # Check for uniqueness, excluding the current instance if it's an update
+            qs = Customer.objects.filter(email=value)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError("A customer with this email already exists.")
+        return value
+
+    def validate_phone(self, value):
+        if value and len(value) < 10:
+            raise serializers.ValidationError("Phone number must be at least 10 characters long.")
+        return value
+
 class InvoiceItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
     product_category = serializers.CharField(source='product.category.name', read_only=True, allow_null=True)
@@ -164,21 +179,6 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         return InvoiceReadSerializer(instance, context=self.context).data
-
-    def validate_email(self, value):
-        if value:
-            # Check for uniqueness, excluding the current instance if it's an update
-            qs = Customer.objects.filter(email=value)
-            if self.instance:
-                qs = qs.exclude(pk=self.instance.pk)
-            if qs.exists():
-                raise serializers.ValidationError("A customer with this email already exists.")
-        return value
-
-    def validate_phone(self, value):
-        if value and len(value) < 10:
-            raise serializers.ValidationError("Phone number must be at least 10 characters long.")
-        return value
 
 class InvoiceSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source='customer.name', read_only=True)
