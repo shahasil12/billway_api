@@ -31,7 +31,7 @@ class OpenSessionView(APIView):
 
         serializer = POSSessionSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(user=request.user, status='OPEN')
+            serializer.save(user=request.user, status='OPEN', company=request.user.company)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -115,6 +115,7 @@ class POSCheckoutView(APIView):
 
             # Create Invoice
             invoice = Invoice.objects.create(
+                company=request.user.company,
                 customer=customer,
                 pos_session=session,
                 subtotal=data['subtotal'],

@@ -6,7 +6,7 @@ class POSSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = POSSession
         fields = '__all__'
-        read_only_fields = ('id', 'user', 'opened_at', 'closed_at', 'status', 'expected_cash', 'cash_difference')
+        read_only_fields = ('id', 'company', 'user', 'opened_at', 'closed_at', 'status', 'expected_cash', 'cash_difference')
 
 class POSSessionCloseSerializer(serializers.Serializer):
     closing_cash = serializers.DecimalField(max_digits=12, decimal_places=2)
