@@ -51,9 +51,13 @@
                 <td class="customer-info" style="width: 50%;">
                     <h3>Billed To:</h3>
                     <p>
-                        <strong>{{ invoice.customer.name }}</strong><br>
-                        {% if invoice.customer.email %}{{ invoice.customer.email }}<br>{% endif %}
-                        {% if invoice.customer.phone %}{{ invoice.customer.phone }}{% endif %}
+                        {% if invoice.customer %}
+                            <strong>{{ invoice.customer.name }}</strong><br>
+                            {% if invoice.customer.email %}{{ invoice.customer.email }}<br>{% endif %}
+                            {% if invoice.customer.phone %}{{ invoice.customer.phone }}{% endif %}
+                        {% else %}
+                            <strong>Walk-in Customer</strong>
+                        {% endif %}
                     </p>
                 </td>
                 <td class="invoice-details" style="width: 50%;">
