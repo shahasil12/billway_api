@@ -32,6 +32,27 @@ class ProductSerializer(serializers.ModelSerializer):
             return obj.image.url
         return None
 
+    def validate_name(self, value):
+        qs = Product.objects.filter(name__iexact=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if hasattr(self.context.get('request'), 'user') and hasattr(self.context['request'].user, 'company'):
+            qs = qs.filter(company=self.context['request'].user.company)
+        if qs.exists():
+            raise serializers.ValidationError("A product with this name already exists.")
+        return value
+
+    def validate_barcode(self, value):
+        if value:
+            qs = Product.objects.filter(barcode__iexact=value)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if hasattr(self.context.get('request'), 'user') and hasattr(self.context['request'].user, 'company'):
+                qs = qs.filter(company=self.context['request'].user.company)
+            if qs.exists():
+                raise serializers.ValidationError("A product with this barcode already exists.")
+        return value
+
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
