@@ -29,7 +29,7 @@ class Product(models.Model):
     tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     barcode = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    image = models.ImageField(upload_to='products/', blank=True, null=True)
+    image = models.URLField(max_length=500, blank=True, null=True)
     track_stock = models.BooleanField(default=False)
     stock = models.IntegerField(default=0)
     min_stock = models.IntegerField(default=0)
