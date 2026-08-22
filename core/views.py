@@ -1,9 +1,23 @@
 import uuid
 import boto3
 from django.conf import settings
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
+
+
+class PingView(APIView):
+    """No-auth health check endpoint — used to wake the Render free-tier server."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            'status': 'ok',
+            'timestamp': timezone.now().isoformat(),
+            'service': 'billway-api',
+        })
+
 
 class GenerateUploadUrlView(APIView):
     permission_classes = [IsAuthenticated]
