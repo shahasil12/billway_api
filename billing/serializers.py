@@ -54,6 +54,8 @@ class ProductSerializer(serializers.ModelSerializer):
         return value
 
 class CustomerSerializer(serializers.ModelSerializer):
+    credit_balance = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    
     class Meta:
         model = Customer
         fields = '__all__'
@@ -115,34 +117,35 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop('items')
-        discount_percentage = validated_data.get('discount_percentage', 0.00)
+        from decimal import Decimal
+        discount_percentage = Decimal(str(validated_data.get('discount_percentage', 0)))
         
         # We will calculate totals
-        subtotal = 0
-        tax_total = 0
+        subtotal = Decimal('0')
+        tax_total = Decimal('0')
 
         # Calculate everything
         calculated_items = []
         for item_data in items_data:
             product = item_data['product']
-            quantity = item_data['quantity']
+            quantity = Decimal(str(item_data['quantity']))
             
             # Stock check
-            if product.track_stock and product.stock < quantity:
+            if product.track_stock and product.stock < item_data['quantity']:
                 raise serializers.ValidationError(f"Not enough stock for {product.name}. Available: {product.stock}")
 
-            unit_price = product.price
-            tax_perc = product.tax_percentage
+            unit_price = Decimal(str(product.price))
+            tax_perc = Decimal(str(product.tax_percentage))
             
             # Line subtotal before discount
             line_subtotal = unit_price * quantity
             subtotal += line_subtotal
             
             # Apply discount to this line's subtotal to calculate tax correctly
-            discounted_line_subtotal = line_subtotal * (1 - discount_percentage / 100)
+            discounted_line_subtotal = line_subtotal * (Decimal('1') - discount_percentage / Decimal('100'))
             
             # Calculate tax on the discounted amount
-            tax_amount = discounted_line_subtotal * (tax_perc / 100)
+            tax_amount = discounted_line_subtotal * (tax_perc / Decimal('100'))
             tax_total += tax_amount
             
             line_total = discounted_line_subtotal + tax_amount
@@ -156,7 +159,7 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
                 'line_total': line_total
             })
 
-        discount_amount = subtotal * (discount_percentage / 100)
+        discount_amount = subtotal * (discount_percentage / Decimal('100'))
         grand_total = subtotal - discount_amount + tax_total
 
         # Auto-generate reference if not provided

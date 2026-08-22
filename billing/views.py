@@ -327,7 +327,17 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         if hasattr(self.request.user, 'company') and self.request.user.company:
-            return Customer.objects.filter(company=self.request.user.company).order_by('-created_at')
+            from django.db.models import Sum, F, DecimalField, ExpressionWrapper
+            from django.db.models.functions import Coalesce
+            
+            qs = Customer.objects.filter(company=self.request.user.company).order_by('-created_at')
+            qs = qs.annotate(
+                total_billed=Coalesce(Sum('invoices__grand_total'), 0, output_field=DecimalField()),
+                total_paid=Coalesce(Sum('invoices__amount_paid'), 0, output_field=DecimalField())
+            ).annotate(
+                credit_balance=ExpressionWrapper(F('total_billed') - F('total_paid'), output_field=DecimalField())
+            )
+            return qs
         return Customer.objects.none()
 
     def perform_create(self, serializer):
