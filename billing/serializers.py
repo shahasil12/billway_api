@@ -165,6 +165,7 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         # Create Invoice
         invoice = Invoice.objects.create(
             customer=validated_data.get('customer'),
+            company=validated_data.get('company'),
             payment_method=validated_data.get('payment_method', 'CASH'),
             discount_percentage=discount_percentage,
             subtotal=subtotal,
